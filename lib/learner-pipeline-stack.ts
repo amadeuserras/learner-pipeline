@@ -3,6 +3,8 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as path from 'path';
 import { Construct } from 'constructs';
 
@@ -30,5 +32,15 @@ export class LearnerPipelineStack extends cdk.Stack {
     });
 
     eventsQueue.grantSendMessages(ingestFn);
+
+    const api = new apigwv2.HttpApi(this, 'EventsApi');
+
+    api.addRoutes({
+      path: '/events',
+      methods: [apigwv2.HttpMethod.POST],
+      integration: new HttpLambdaIntegration('IngestIntegration', ingestFn),
+    });
+
+    new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
   }
 }
