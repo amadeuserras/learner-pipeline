@@ -55,6 +55,20 @@ export class LearnerPipelineStack extends cdk.Stack {
       integration: new HttpLambdaIntegration('IngestIntegration', ingestFn),
     });
 
+    const readFn = new NodejsFunction(this, 'ReadFn', {
+      entry: path.join(__dirname, '../lambda/read.ts'),
+      runtime: lambda.Runtime.NODEJS_22_X,
+      environment: { RESULTS_TABLE: resultsTable.tableName },
+    });
+
+    resultsTable.grantReadData(readFn);
+
+    api.addRoutes({
+      path: '/learners/{learnerId}/progress',
+      methods: [apigwv2.HttpMethod.GET],
+      integration: new HttpLambdaIntegration('ReadIntegration', readFn),
+    });
+
     new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
   }
 }
