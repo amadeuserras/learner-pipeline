@@ -4,3 +4,6 @@ CLAUDE.local.md
 
 # dependencies
 node_modules
+
+# cdk output
+cdk.out
