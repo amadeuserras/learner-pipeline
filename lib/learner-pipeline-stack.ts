@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib/core';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
@@ -30,6 +31,16 @@ export class LearnerPipelineStack extends cdk.Stack {
 
     const eventsQueue = new sqs.Queue(this, 'EventsQueue', {
       deadLetterQueue: { queue: deadLetterQueue, maxReceiveCount: 3 },
+    });
+
+    new cloudwatch.Alarm(this, 'DeadLetterQueueNotEmptyAlarm', {
+      metric: deadLetterQueue.metricApproximateNumberOfMessagesVisible({
+        period: cdk.Duration.minutes(1),
+      }),
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
 
     const ingestFn = new NodejsFunction(this, 'IngestFn', {
