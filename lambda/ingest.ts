@@ -21,4 +21,3 @@ export const handler = async (
 
   return { statusCode: 202, body: JSON.stringify({ queued: body.eventId }) };
 };
-t
