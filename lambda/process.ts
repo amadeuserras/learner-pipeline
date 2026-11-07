@@ -1,21 +1,18 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { SQSEvent } from 'aws-lambda';
+import { LearnerEventSchema, StatsSchema, type Stats } from './schemas';
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const RESULTS = process.env.RESULTS_TABLE;
 const PROCESSED = process.env.PROCESSED_TABLE;
 
-type Stats = { avgScore: number; bestScore: number; count: number };
+const EMPTY_STATS: Stats = { avgScore: 0, bestScore: 0, count: 0 };
 
 // Read one results item. If it does not exist yet, start from zero.
 const readStats = async (PK: string, SK: string): Promise<Stats> => {
   const { Item } = await db.send(new GetCommand({ TableName: RESULTS, Key: { PK, SK } }));
-  return {
-    avgScore: Item?.avgScore ?? 0,
-    bestScore: Item?.bestScore ?? 0,
-    count: Item?.count ?? 0,
-  };
+  return Item ? StatsSchema.parse(Item) : EMPTY_STATS;
 };
 
 // Fold one new score into the stats.
@@ -27,13 +24,11 @@ const addScore = (s: Stats, score: number): Stats => ({
 
 export const handler = async (event: SQSEvent): Promise<void> => {
   for (const record of event.Records) {
-    const { id, learnerId, topic, score } = JSON.parse(record.body);
+    const { id, learnerId, topic, score } = LearnerEventSchema.parse(JSON.parse(record.body));
     const PK = `LEARNER#${learnerId}`;
 
     // 1.1 Idempotency check: skip if we already processed this event.
-    const seen = await db.send(
-      new GetCommand({ TableName: PROCESSED, Key: { PK: `EVENT#${id}` } }),
-    );
+    const seen = await db.send(new GetCommand({ TableName: PROCESSED, Key: { PK: `EVENT#${id}` } }));
     if (seen.Item) continue;
 
     // 2. Read the two items that depend on this event.
