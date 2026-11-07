@@ -5,6 +5,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
 import { Construct } from 'constructs';
 
@@ -32,6 +33,19 @@ export class LearnerPipelineStack extends cdk.Stack {
     });
 
     eventsQueue.grantSendMessages(ingestFn);
+
+    const processFn = new NodejsFunction(this, 'ProcessFn', {
+      entry: path.join(__dirname, '../lambda/process.ts'),
+      runtime: lambda.Runtime.NODEJS_22_X,
+      environment: {
+        PROCESSED_TABLE: processedEventsTable.tableName,
+        RESULTS_TABLE: resultsTable.tableName,
+      },
+    });
+
+    processFn.addEventSource(new SqsEventSource(eventsQueue));
+    processedEventsTable.grantReadWriteData(processFn);
+    resultsTable.grantReadWriteData(processFn);
 
     const api = new apigwv2.HttpApi(this, 'EventsApi');
 

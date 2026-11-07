@@ -25,7 +25,9 @@
   },
   "homepage": "https://github.com/amadeuserras/learner-pipeline#readme",
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1164.0",
     "@aws-sdk/client-sqs": "^3.1164.0",
+    "@aws-sdk/lib-dynamodb": "^3.1164.0",
     "@swc/core": "^1.15.0",
     "@swc/jest": "^0.2.39",
     "@types/aws-lambda": "^8.10.164",
