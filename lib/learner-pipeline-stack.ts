@@ -24,7 +24,13 @@ export class LearnerPipelineStack extends cdk.Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
     });
 
-    const eventsQueue = new sqs.Queue(this, 'EventsQueue');
+    const deadLetterQueue = new sqs.Queue(this, 'EventsDeadLetterQueue', {
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
+    const eventsQueue = new sqs.Queue(this, 'EventsQueue', {
+      deadLetterQueue: { queue: deadLetterQueue, maxReceiveCount: 3 },
+    });
 
     const ingestFn = new NodejsFunction(this, 'IngestFn', {
       entry: path.join(__dirname, '../lambda/ingest.ts'),
