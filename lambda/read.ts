@@ -2,6 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { z } from 'zod';
+import { logger } from './logger';
 import { ProgressRequestSchema, StatsSchema, type ProgressResponse } from './schemas';
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -14,7 +15,9 @@ export const handler = async (
     topic: event.queryStringParameters?.topic,
   });
   if (!parsed.success) {
-    return { statusCode: 400, body: JSON.stringify({ error: z.flattenError(parsed.error).fieldErrors }) };
+    const fieldErrors = z.flattenError(parsed.error).fieldErrors;
+    logger.warn('request rejected', { fieldErrors });
+    return { statusCode: 400, body: JSON.stringify({ error: fieldErrors }) };
   }
   const { learnerId, topic } = parsed.data;
 
@@ -27,9 +30,11 @@ export const handler = async (
   );
 
   if (!Item) {
+    logger.info('no progress found', { learnerId, topic });
     return { statusCode: 404, body: JSON.stringify({ error: 'no progress found' }) };
   }
 
   const response: ProgressResponse = { learnerId, topic, ...StatsSchema.parse(Item) };
+  logger.info('progress returned', { learnerId, topic });
   return { statusCode: 200, body: JSON.stringify(response) };
 };

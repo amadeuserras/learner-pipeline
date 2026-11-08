@@ -1,6 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { SQSEvent } from 'aws-lambda';
+import { logger } from './logger';
 import { LearnerEventSchema, StatsSchema, type Stats } from './schemas';
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -29,7 +30,10 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
     // 1.1 Idempotency check: skip if we already processed this event.
     const seen = await db.send(new GetCommand({ TableName: PROCESSED, Key: { PK: `EVENT#${id}` } }));
-    if (seen.Item) continue;
+    if (seen.Item) {
+      logger.info('duplicate event skipped', { eventId: id });
+      continue;
+    }
 
     // 2. Read the two items that depend on this event.
     const topicStats = await readStats(PK, `TOPIC#${topic}`);
@@ -45,5 +49,6 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
     // 5. Write the eventId to the processed table.
     await db.send(new PutCommand({ TableName: PROCESSED, Item: { PK: `EVENT#${id}` } }));
+    logger.info('event processed', { eventId: id, learnerId, topic });
   }
 };

@@ -3,6 +3,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
@@ -47,6 +48,10 @@ export class LearnerPipelineStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/ingest.ts'),
       runtime: lambda.Runtime.NODEJS_22_X,
       environment: { QUEUE_URL: eventsQueue.queueUrl },
+      logGroup: new logs.LogGroup(this, 'IngestLogGroup', {
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
     });
 
     eventsQueue.grantSendMessages(ingestFn);
@@ -58,6 +63,10 @@ export class LearnerPipelineStack extends cdk.Stack {
         PROCESSED_TABLE: processedEventsTable.tableName,
         RESULTS_TABLE: resultsTable.tableName,
       },
+      logGroup: new logs.LogGroup(this, 'ProcessLogGroup', {
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
     });
 
     processFn.addEventSource(new SqsEventSource(eventsQueue));
@@ -76,6 +85,10 @@ export class LearnerPipelineStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/read.ts'),
       runtime: lambda.Runtime.NODEJS_22_X,
       environment: { RESULTS_TABLE: resultsTable.tableName },
+      logGroup: new logs.LogGroup(this, 'ReadLogGroup', {
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
     });
 
     resultsTable.grantReadData(readFn);

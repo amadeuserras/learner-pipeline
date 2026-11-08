@@ -1,6 +1,7 @@
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { z } from 'zod';
+import { logger } from './logger';
 import { LearnerEventSchema } from './schemas';
 
 const sqs = new SQSClient({});
@@ -21,7 +22,11 @@ export const handler = async (
   }
 
   const parsed = LearnerEventSchema.safeParse(json);
-  if (!parsed.success) return bad(z.flattenError(parsed.error).fieldErrors);
+  if (!parsed.success) {
+    const fieldErrors = z.flattenError(parsed.error).fieldErrors;
+    logger.warn('event rejected', { fieldErrors });
+    return bad(fieldErrors);
+  }
 
   await sqs.send(
     new SendMessageCommand({
@@ -30,5 +35,6 @@ export const handler = async (
     }),
   );
 
+  logger.info('event queued', { eventId: parsed.data.id, learnerId: parsed.data.learnerId });
   return { statusCode: 202, body: JSON.stringify({ queued: parsed.data.id }) };
 };
